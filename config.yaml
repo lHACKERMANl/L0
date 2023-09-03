@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres_container
+    environment:
+      POSTGRES_DB: postgreDB
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: 123
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+
+  nats:
+    domainname: "0.0.0.0:4222"
+    image: nats:latest
+    container_name: nats_container
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  your-app:
+    build: ../../..
+    container_name: your_app_container
+    depends_on:
+      - postgres
+      - nats
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
