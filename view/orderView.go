@@ -9,6 +9,7 @@ import (
 
 type View interface {
 	ShowOrderDetails(orderDetails OrderDetails) string
+	ShowOrder() string
 	ShowError(msg string)
 }
 
@@ -62,17 +63,12 @@ func NewFakeView() *FakeView {
 }
 
 func (v *FakeView) ShowOrderDetails(orderDetails OrderDetails) string {
-	//tmpl, err := template.ParseFiles("static/index.html")
-	//if err != nil {
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//}
-	//
-	//err = tmpl.Execute(w, orderDetails)
-	//if err != nil {
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//}
+	html := OrderWithDataHTMLView(orderDetails)
+	return html
+}
 
-	html := OrderHTMLView(orderDetails)
+func (v *FakeView) ShowOrder() string {
+	html := OrderHTMLView()
 	return html
 }
 

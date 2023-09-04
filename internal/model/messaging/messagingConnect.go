@@ -46,7 +46,7 @@ func (m *NATSMessaging) ConnectToMessaging(MessagingConf config.LoginData) error
 	sc, err := stan.Connect(
 		"test-cluster",
 		"my-client",
-		stan.NatsURL("nats://172.30.0.2:4222"))
+		stan.NatsURL("nats://172.30.0.3:4222"))
 	if err != nil {
 		log.Fatalf("Error in NATS connection: %v", err)
 		return err

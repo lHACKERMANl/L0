@@ -236,7 +236,7 @@ var templateFuncs = template.FuncMap{
 	},
 }
 
-func OrderHTMLView(orderDetails OrderDetails) string {
+func OrderWithDataHTMLView(orderDetails OrderDetails) string {
 	tmpl, err := template.New("orderTemplate").Funcs(templateFuncs).Parse(orderTemplate)
 	if err != nil {
 		return fmt.Sprintf("Error parsing template: %v", err)

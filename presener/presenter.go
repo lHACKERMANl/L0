@@ -29,26 +29,51 @@ func (p *Presenter) orderHandler() http.Handler {
 		// Извлечь параметры запроса
 		orderID := r.URL.Query().Get("order_id")
 
-		// Вызвать метод презентера для получения деталей заказа
-		orderDetails, err := p.model.GetOrderDetails(orderID)
-		if err != nil {
-			http.Error(w, "Error getting order details", http.StatusInternalServerError)
-			return
+		if orderID == "" {
+			err := p.handleOrder(w)
+			if err != nil {
+				log.Printf("Warning in getting data from handleOrder() func: %v", err)
+			}
+		} else if orderID != "" {
+			err := p.handleOrderDetails(w, orderID)
+			if err != nil {
+				log.Printf("Warning in getting data from handleOrderDetails() func: %v", err)
+			}
 		}
-
-		od := OrderDetails{
-			OrderID:  orderID,
-			Order:    orderDetails.Order,
-			Payment:  orderDetails.Payment,
-			Items:    orderDetails.Items,
-			Delivery: orderDetails.Delivery}
-
-		// Использовать view для отображения деталей заказа
-		html := p.view.ShowOrderDetails(View.OrderDetails(od))
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, html)
 	})
+}
+
+func (p *Presenter) handleOrder(w http.ResponseWriter) error {
+	html := p.view.ShowOrder()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, html)
+	return nil
+}
+
+func (p *Presenter) handleOrderDetails(w http.ResponseWriter, orderID string) error {
+	// Вызвать метод презентера для получения деталей заказа
+	orderDetails, err := p.model.GetOrderDetails(orderID)
+	if err != nil {
+		http.Error(w, "Error getting order details", http.StatusInternalServerError)
+		return err
+	}
+
+	od := OrderDetails{
+		OrderID:  orderID,
+		Order:    orderDetails.Order,
+		Payment:  orderDetails.Payment,
+		Items:    orderDetails.Items,
+		Delivery: orderDetails.Delivery,
+	}
+
+	// Использовать view для отображения деталей заказа
+	html := p.view.ShowOrderDetails(View.OrderDetails(od))
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, html)
+
+	return nil
 }
 
 func (p *Presenter) SetupHandlers() {
