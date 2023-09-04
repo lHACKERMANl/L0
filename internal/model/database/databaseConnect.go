@@ -209,14 +209,14 @@ func (d *Database) GetOrderDetails(orderID string) (model.OrderRepository, error
 		&order.OrderUID,
 		&order.TrackNumber,
 		&order.Entry,
-		&order.Locale,
-		&internalSignature,
+		&order.DataCreated,
 		&order.CustomerId,
 		&order.DeliveryService,
 		&order.Shardkey,
 		&order.SmID,
-		&order.DataCreated,
 		&order.OofShard,
+		&internalSignature,
+		&order.Locale,
 	)
 
 	if err == sql.ErrNoRows {
@@ -273,6 +273,7 @@ func (d *Database) GetItemsForOrder(trackNumber string) ([]model.ItemsRepository
 		var item model.ItemsRepository
 		err := rows.Scan(
 			&item.ChrtID,
+			&item.OrderID,
 			&item.TrackNumber,
 			&item.Price,
 			&item.Rid,
@@ -283,7 +284,6 @@ func (d *Database) GetItemsForOrder(trackNumber string) ([]model.ItemsRepository
 			&item.NmID,
 			&item.Brand,
 			&item.Status,
-			&item.OrderID,
 		)
 		if err != nil {
 			return nil, err
@@ -302,14 +302,14 @@ func (d *Database) GetDeliveryDetails(orderUID string) (model.DeliveryRepository
 	var delivery model.DeliveryRepository
 
 	err := d.db.QueryRow(`SELECT * FROM delivery WHERE "order_uid" = $1;`, orderUID).Scan(
+		&delivery.OrderID,
 		&delivery.Name,
 		&delivery.Phone,
-		&delivery.Zip,
 		&delivery.City,
+		&delivery.Zip,
 		&delivery.Address,
 		&delivery.Region,
 		&delivery.Email,
-		&delivery.OrderID,
 	)
 	if err != nil {
 		return model.DeliveryRepository{}, err
