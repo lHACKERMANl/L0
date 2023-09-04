@@ -1,7 +1,6 @@
 package View
 
 import (
-	"fmt"
 	"html/template"
 	"log"
 	"mvcModule/internal/model"
@@ -42,13 +41,13 @@ func (h *ViewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	orderDetails := h.view.ShowOrderDetails(order) // Получаем детали заказа
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl, err := template.ParseFiles("index.html")
+	tmpl, err := template.ParseFiles("static/index.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	err = tmpl.Execute(w, orderDetails)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -63,7 +62,17 @@ func NewFakeView() *FakeView {
 }
 
 func (v *FakeView) ShowOrderDetails(orderDetails OrderDetails) string {
-	html := fmt.Sprintf("Order ID: %s<br>Order Details: %s", orderDetails.OrderID, orderDetails)
+	//tmpl, err := template.ParseFiles("static/index.html")
+	//if err != nil {
+	//	http.Error(w, err.Error(), http.StatusInternalServerError)
+	//}
+	//
+	//err = tmpl.Execute(w, orderDetails)
+	//if err != nil {
+	//	http.Error(w, err.Error(), http.StatusInternalServerError)
+	//}
+
+	html := OrderHTMLView(orderDetails)
 	return html
 }
 
