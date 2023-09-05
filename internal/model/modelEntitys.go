@@ -1,30 +1,32 @@
 package model
 
+import "time"
+
 type OrderRepository struct {
-	OrderUID          string `json:"order_uid"`
-	TrackNumber       string `json:"track_number"`
-	Entry             string `json:"entry"`
-	Locale            string `json:"locale"`
-	InternalSignature string `json:"internal_signature"`
-	CustomerId        string `json:"customer_id"`
-	DeliveryService   string `json:"delivery_service"`
-	Shardkey          string `json:"shardkey"`
-	SmID              string `json:"sm_id"`
-	DataCreated       string `json:"data_created"`
-	OofShard          string `json:"oof_shard"`
+	OrderUID          string    `json:"order_uid"`
+	TrackNumber       string    `json:"track_number"`
+	Entry             string    `json:"entry"`
+	Locale            string    `json:"locale"`
+	InternalSignature string    `json:"internal_signature"`
+	CustomerId        string    `json:"customer_id"`
+	DeliveryService   string    `json:"delivery_service"`
+	Shardkey          string    `json:"shardkey"`
+	SmID              string    `json:"sm_id"`
+	DataCreated       time.Time `json:"data_created"`
+	OofShard          string    `json:"oof_shard"`
 }
 
 type PaymentRepository struct {
-	Transaction  string `json:"transaction"`
-	RequestID    string `json:"request_id"`
-	Currency     string `json:"currency"`
-	Provider     string `json:"provider"`
-	Amount       string `json:"amount"`
-	PaymentDT    string `json:"payment_dt"`
-	Bank         string `json:"bank"`
-	DeliveryCost string `json:"delivery_cost"`
-	GoodsTotal   string `json:"goods_total"`
-	CustomFee    string `json:"custom_fee"`
+	Transaction  string    `json:"transaction"`
+	RequestID    string    `json:"request_id"`
+	Currency     string    `json:"currency"`
+	Provider     string    `json:"provider"`
+	Amount       string    `json:"amount"`
+	PaymentDT    time.Time `json:"payment_dt"`
+	Bank         string    `json:"bank"`
+	DeliveryCost string    `json:"delivery_cost"`
+	GoodsTotal   string    `json:"goods_total"`
+	CustomFee    string    `json:"custom_fee"`
 }
 
 type ItemsRepository struct {
@@ -51,4 +53,11 @@ type DeliveryRepository struct {
 	Region  string `json:"region"`
 	Email   string `json:"email"`
 	OrderID string `json:"order_uid"`
+}
+
+type OrderDetails struct {
+	Order    OrderRepository
+	Payment  PaymentRepository
+	Items    []ItemsRepository
+	Delivery DeliveryRepository
 }

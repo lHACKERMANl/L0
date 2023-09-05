@@ -8,6 +8,5 @@ import (
 func main() {
 	_ = presener.Init()
 
-	// Инициализация HTTP-сервера
 	http.ListenAndServe(":8080", nil)
 }

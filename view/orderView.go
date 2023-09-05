@@ -40,6 +40,7 @@ func (h *ViewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Items:    []model.ItemsRepository{},
 		Delivery: model.DeliveryRepository{},
 	}
+
 	orderDetails := h.view.ShowOrderDetails(order) // Получаем детали заказа
 
 	tmpl, err := template.ParseFiles("static/index.html")
@@ -76,10 +77,10 @@ func (v *FakeView) ShowError(msg string) {
 	log.Fatalln("Error in view: ", msg)
 }
 
-func initView() {
-	view := NewFakeView()
-	viewHandler := NewViewHandler(view)
-
-	http.Handle("/order", viewHandler)
-	http.ListenAndServe(":8080", nil)
-}
+//func initView() {
+//	view := NewFakeView()
+//	viewHandler := NewViewHandler(view)
+//
+//	http.Handle("/order", viewHandler)
+//	http.ListenAndServe(":8080", nil)
+//}

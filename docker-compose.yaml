@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:latest
-    container_name: postgres_container
+    container_name: my_postgres_container
     environment:
       POSTGRES_DB: postgreDB
       POSTGRES_USER: root
@@ -21,16 +21,31 @@ services:
       - "4222:4222"
       - "8222:8222"
 
-  your-app:
+  prod-app:
     build: .
     container_name: your_app_container
     depends_on:
       - postgres
       - nats-streaming
+      - postgres-cache
     ports:
       - "8080:8080"
     volumes:
-      - ./config.yaml:/app/config.yaml  
+      - ./config.yaml:/app/config.yaml
+
+  postgres-cache:
+    image: postgres:latest
+    container_name: postgres_cache_container
+    environment:
+      POSTGRES_DB: cacheDB
+      POSTGRES_USER: cacheUser
+      POSTGRES_PASSWORD: 123
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./cache-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_cache_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data:
+  postgres_cache_data:

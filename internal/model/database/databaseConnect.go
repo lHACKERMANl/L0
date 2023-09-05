@@ -22,6 +22,7 @@ type IDatabase interface {
 	GetPaymentDetails(transactionID string) (model.PaymentRepository, error)
 	GetItemsForOrder(trackNumber string) ([]model.ItemsRepository, error)
 	GetDeliveryDetails(orderUID string) (model.DeliveryRepository, error)
+	Ping() error
 }
 
 type Database struct {
@@ -49,11 +50,11 @@ func (d *Database) ConnectToDB(PSQLconf config.LoginData) error {
 	var err error
 	psqlInfo := fmt.Sprintf("postgres://%s:%s@postgres/%s?sslmode=disable",
 		env.PostgresUser, env.PostgresPassword, env.PostgresDB)
-	d.db, err = sql.Open(name, psqlInfo)
+	db, err := sql.Open(name, psqlInfo)
 	if err != nil {
 		log.Fatalln("Error opening DB: ", err)
 	}
-	err = d.db.Ping()
+	err = db.Ping()
 	if err != nil {
 		log.Fatalf("Error to connect database: %v", err)
 	}
@@ -61,142 +62,16 @@ func (d *Database) ConnectToDB(PSQLconf config.LoginData) error {
 		env.PostgresUser, env.PostgresPassword, env.PostgresDB)
 	//defer d.db.Close()
 
-	//row := d.db.QueryRow(`SELECT * FROM orders WHERE "order_uid" = $1;`, "b563feb7b2b84b6test")
-	//
-	//var order model.OrderRepository
-	//
-	//err = row.Scan(
-	//	&order.OrderUID,
-	//	&order.TrackNumber,
-	//	&order.Entry,
-	//	&order.Locale,
-	//	&order.InternalSignature,
-	//	&order.CustomerId,
-	//	&order.DeliveryService,
-	//	&order.Shardkey,
-	//	&order.SmID,
-	//	&order.DataCreated,
-	//	&order.OofShard,
-	//)
-	//
-	//if err != nil {
-	//	log.Printf("Error in CreateDB: %v", err)
-	//}
-
+	d.db = db
 	return nil
 }
 
-func (d *Database) SaveOrderRepositoryToDB(dataOrderRepository model.OrderRepository) {
-	err := d.db.QueryRow(`INSERT INTO orders (
-		order_uid, 
-		track_number, 
-		entry, 
-		locale, 
-		internal_signature,
-		customer_id,
-		delivery_service,
-		shardkey,
-		sm_id,
-		date_created,
-		oof_shard) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		dataOrderRepository.OrderUID,
-		dataOrderRepository.TrackNumber,
-		dataOrderRepository.Entry,
-		dataOrderRepository.Locale,
-		dataOrderRepository.InternalSignature,
-		dataOrderRepository.CustomerId,
-		dataOrderRepository.DeliveryService,
-		dataOrderRepository.Shardkey,
-		dataOrderRepository.SmID,
-		dataOrderRepository.DataCreated,
-		dataOrderRepository.OofShard)
-
+func (d *Database) Ping() error {
+	err := d.db.Ping()
 	if err != nil {
-		log.Fatalln("Error with save Order Repository to DB: ", err)
+		return err
 	}
-}
-
-func (d *Database) SavePaymentRepositoryToDB(dataPaymentRepository model.PaymentRepository) {
-	err := d.db.QueryRow(`INSERT INTO payment (
-		transaction,
-		request_id,
-		currency,
-		provider,
-		amount,
-		payment_dt,
-		bank,
-		delivery_cost,
-		goods_total,
-		custom_fee) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		dataPaymentRepository.Transaction,
-		dataPaymentRepository.RequestID,
-		dataPaymentRepository.Currency,
-		dataPaymentRepository.Provider,
-		dataPaymentRepository.Amount,
-		dataPaymentRepository.PaymentDT,
-		dataPaymentRepository.Bank,
-		dataPaymentRepository.DeliveryCost,
-		dataPaymentRepository.GoodsTotal,
-		dataPaymentRepository.CustomFee)
-
-	if err != nil {
-		log.Fatalln("Error with save Payment Repository to DB: ", err)
-	}
-}
-
-func (d *Database) SaveItemsRepositoryToDB(dataItemsRepository model.ItemsRepository) {
-	err := d.db.QueryRow(`INSERT INTO items (
-		"chrt_id",
-		"track_number",
-		"price",
-		"rid",
-		"name",
-		"sale",
-		"size",
-		"total_price",
-		"nm_id",
-		"brand",
-		"status") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		dataItemsRepository.ChrtID,
-		dataItemsRepository.TrackNumber,
-		dataItemsRepository.Price,
-		dataItemsRepository.Rid,
-		dataItemsRepository.Name,
-		dataItemsRepository.Sale,
-		dataItemsRepository.Size,
-		dataItemsRepository.TotalPrice,
-		dataItemsRepository.NmID,
-		dataItemsRepository.Brand,
-		dataItemsRepository.Status)
-
-	if err != nil {
-		log.Fatalln("Error with save Items Repository to DB: ", err)
-	}
-}
-
-func (d *Database) SaveDeliveryRepositoryToDB(dataDeliveryRepository model.DeliveryRepository, orderID string) {
-	err := d.db.QueryRow(`INSERT INTO delivery (
-		"name",
-		"phone",
-		"zip",
-		"city",
-		"address",
-		"region",
-		"email",
-		"order_uid") VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		dataDeliveryRepository.Name,
-		dataDeliveryRepository.Phone,
-		dataDeliveryRepository.Zip,
-		dataDeliveryRepository.City,
-		dataDeliveryRepository.Address,
-		dataDeliveryRepository.Region,
-		dataDeliveryRepository.Email,
-		orderID)
-
-	if err != nil {
-		log.Fatalln("Error with save Items Repository to DB: ", err)
-	}
+	return nil
 }
 
 func (d *Database) GetOrderDetails(orderID string) (model.OrderRepository, error) {

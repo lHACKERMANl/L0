@@ -1,6 +1,8 @@
 package cache
 
 import (
+	"database/sql"
+	"log"
 	"mvcModule/internal/model"
 	"sync"
 )
@@ -14,12 +16,64 @@ type ICache interface {
 type Cache struct {
 	data map[string]interface{}
 	mu   sync.RWMutex
+	db   *sql.DB
 }
 
-func NewCache() *Cache {
+func NewCache() (*Cache, error) {
+	db, err := sql.Open("postgres", "postgres://root:123@postgres/postgreDB?sslmode=disable")
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Ping establashed %v", db.Ping())
+
 	return &Cache{
 		data: make(map[string]interface{}),
+		db:   db,
+	}, nil
+}
+
+func (c *Cache) loadCacheFromDatabase() (map[string]interface{}, error) {
+	query := "SELECT key, value FROM cache_table"
+	rows, err := c.db.Query(query)
+	if err == sql.ErrNoRows {
+		log.Printf("Empty data")
+	} else if err != nil {
+		return nil, err
 	}
+	defer rows.Close()
+
+	cacheData := make(map[string]interface{})
+	for rows.Next() {
+		var key string
+		var value []byte
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		cacheData[key] = value
+	}
+
+	return cacheData, nil
+}
+
+func (c *Cache) saveCacheToDatabase(data map[string]interface{}) error {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for key, value := range data {
+		_, err := tx.Exec("INSERT INTO cache_table (key, value) VALUES ($1, $2)", key, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Cache) Get(key string) (interface{}, bool) {
@@ -87,4 +141,64 @@ func (c *Cache) GetDelivery(deliveryID string) (model.DeliveryRepository, bool) 
 		return model.DeliveryRepository{}, false
 	}
 	return delivery.(model.DeliveryRepository), true
+}
+
+func (c *Cache) ConstructOrderDetails(orderID string) model.OrderDetails {
+	cOrder, ok := c.GetOrder(orderID)
+	if ok != true {
+		log.Fatalf("GetOrder chache exception")
+	}
+	cPayment, ok := c.GetPayment(orderID)
+	if ok != true {
+		log.Fatalf("GetPayment chache exception")
+	}
+	cItems, ok := c.GetItemsForOrder(orderID)
+	if ok != true {
+		log.Fatalf("GetItemsForOrder chache exception")
+	}
+	cDelivery, ok := c.GetDelivery(orderID)
+	if ok != true {
+		log.Fatalf("GetDelivery chache exception")
+	}
+
+	return model.OrderDetails{
+		cOrder,
+		cPayment,
+		cItems,
+		cDelivery,
+	}
+}
+
+func (c *Cache) SaveOrderDetails(orderID string, details model.OrderDetails) {
+	c.Set(orderID, details)
+}
+
+func (c *Cache) GetOrderDetails(orderID string) (model.OrderDetails, bool) {
+	delivery, ok := c.Get(orderID)
+	if !ok {
+		return model.OrderDetails{}, false
+	}
+	return delivery.(model.OrderDetails), true
+}
+
+func (c *Cache) InitializeCache() error {
+	cacheData, err := c.loadCacheFromDatabase()
+	if err != nil {
+		log.Fatalf("Error select data from db: %v", err)
+		return err
+	}
+
+	if cacheData != nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		c.data = cacheData
+		log.Println("Cache loaded from database.")
+	} else {
+		if err := c.saveCacheToDatabase(c.data); err != nil {
+			log.Fatalf("Error saving cache to database: %v", err)
+		}
+		log.Println("Cache created and saved to database.")
+	}
+
+	return nil
 }

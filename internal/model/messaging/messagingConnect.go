@@ -1,31 +1,34 @@
 package messaging
 
 import (
-	"encoding/json"
+	"fmt"
 	_ "github.com/nats-io/nats.go"
 	"github.com/nats-io/stan.go"
 	"log"
 	"mvcModule/internal/config"
 	"mvcModule/internal/model"
-	"mvcModule/internal/model/cache"
 	"mvcModule/internal/model/database"
-
-	"github.com/mitchellh/mapstructure"
+	"reflect"
+	"sync"
+	"time"
 )
 
 type IMessaging interface {
-	ConnectToMessaging(MessagingConf config.LoginData) error
+	ConnectToMessaging() error
 	Subscribe() error
+}
+
+type OrderDetails struct {
+	OrderID  string
+	Order    model.OrderRepository
+	Payment  model.PaymentRepository
+	Items    []model.ItemsRepository
+	Delivery model.DeliveryRepository
 }
 
 type Messaging struct{}
 
-// Subscribe implements IMessaging.
 func (*Messaging) Subscribe() error {
-	panic("unimplemented")
-}
-
-func (*Messaging) ConnectToMessaging(MessagingConf config.LoginData) error {
 	panic("unimplemented")
 }
 
@@ -34,84 +37,119 @@ type NATSMessaging struct {
 	database database.IDatabase
 }
 
-func NatsConnect(db database.IDatabase, nats stan.Conn) *NATSMessaging {
-	return &NATSMessaging{
-		natsConn: nats,
-		database: db,
-	}
-}
+func (m *NATSMessaging) ConnectToMessaging() error {
 
-func (m *NATSMessaging) ConnectToMessaging(MessagingConf config.LoginData) error {
-	var err error
+	url := fmt.Sprintf("nats://172.30.0.40:4222")
 	sc, err := stan.Connect(
 		"test-cluster",
-		"my-client",
-		stan.NatsURL("nats://172.30.0.3:4222"))
+		"worker",
+		stan.NatsURL(url))
 	if err != nil {
 		log.Fatalf("Error in NATS connection: %v", err)
 		return err
 	}
-	msg := []byte("Hello")
-	err = sc.Publish("subj", msg)
-	if err != nil {
-		log.Fatalf("Ошибка при отправке сообщения: %v", err)
-	}
+	log.Printf("Connection with nats: %v estableshed", url)
+	m.natsConn = sc
 	return nil
 }
 
-func (m *NATSMessaging) Subscribe() error {
-	sub, err := m.natsConn.Subscribe("saveToDB", func(msg *stan.Msg) {
-		recivedMsg := msg.Data
-		order, payment, items, delivery := handleMsg(recivedMsg)
+func (m *NATSMessaging) NATSub() (OrderDetails, error) {
+	var orderDetails OrderDetails
 
-		cache := cache.NewCache()
+	cache := make(map[string]string)
+	var cacheMutex sync.Mutex
+	var orderID string
 
-		cache.SaveOrder(order.OrderUID, order)
-		cache.SavePayment(payment.PaymentDT, payment)
-		cache.SaveItemsForOrder(order.OrderUID, items)
-		cache.SaveDelivery(delivery.OrderID, delivery)
+	terminateChannel := make(chan struct{})
 
-		m.database.SaveOrderRepositoryToDB(order)
-		m.database.SavePaymentRepositoryToDB(payment)
-		for _, item := range items {
-			m.database.SaveItemsRepositoryToDB(item)
+	_, err := m.natsConn.Subscribe("getFromDB", func(msg *stan.Msg) {
+		orderID = string(msg.Data)
+		log.Printf("orderID: %v type: %v", orderID, reflect.TypeOf(orderID))
+
+		err := msg.Ack()
+		if err != nil {
+			log.Printf("Error acknowledging message: %v", err)
 		}
-		m.database.SaveDeliveryRepositoryToDB(delivery, order.OrderUID)
-	}, stan.DurableName("saveData"))
+
+		conf, err := config.GetDataFromDockerCompose("config.yaml")
+		if err != nil {
+			log.Fatalln("no data from config")
+		}
+
+		err = m.database.ConnectToDB(conf)
+		if err != nil {
+			return
+		}
+
+		err = m.database.Ping()
+		if err != nil {
+			log.Printf("No DB connection: %v", err)
+		} else {
+			log.Printf("DB Ping status: %v")
+		}
+
+		order, err := m.database.GetOrderDetails(orderID)
+		if err != nil {
+			log.Printf("Error getting order details from messaging")
+		}
+
+		payment, err := m.database.GetPaymentDetails(orderID)
+		if err != nil {
+			log.Printf("Error getting payment details from messaging")
+		}
+
+		items, err := m.database.GetItemsForOrder(order.TrackNumber)
+		if err != nil {
+			log.Printf("Error getting items details from messaging")
+		}
+
+		delivery, err := m.database.GetDeliveryDetails(orderID)
+		if err != nil {
+			log.Printf("Error getting delivery details from messaging")
+		}
+
+		orderDetails = OrderDetails{
+			Order:    order,
+			Payment:  payment,
+			Items:    items,
+			Delivery: delivery,
+		}
+
+		//cache
+		cacheMutex.Lock()
+		cache["getFromDB"] = orderID
+		cacheMutex.Unlock()
+
+		log.Printf("OrderID `%s` got and wrote:\n", orderID)
+
+		go func() {
+			TTLcache := 10 * time.Minute
+			ticker := time.NewTicker(TTLcache)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ticker.C:
+					cacheMutex.Lock()
+					for key := range cache {
+						delete(cache, key)
+					}
+					cacheMutex.Unlock()
+				case <-terminateChannel:
+					return
+				}
+			}
+		}()
+
+	})
 	if err != nil {
-		log.Fatalln("Subscription error: ", err)
-		return err
-	}
-	defer sub.Unsubscribe()
-	return nil
-}
-
-func handleMsg(msg []byte) (model.OrderRepository, model.PaymentRepository, []model.ItemsRepository, model.DeliveryRepository) {
-	var data map[string]interface{}
-	if err := json.Unmarshal(msg, &data); err != nil {
-		log.Fatalln("Error decoding JSON:", err)
+		log.Fatalf("Error with NATS connection: %v", err)
 	}
 
-	var order model.OrderRepository
-	var payment model.PaymentRepository
-	var items []model.ItemsRepository
-	var delivery model.DeliveryRepository
-
-	if err := mapstructure.Decode(data["order"], &order); err != nil {
-		log.Fatalln("Error decoding order: ", err)
+	for {
+		select {
+		case <-terminateChannel:
+			return orderDetails, nil
+		}
 	}
-
-	if err := mapstructure.Decode(data["payment"], &payment); err != nil {
-		log.Fatalln("Error payment order: ", err)
-	}
-
-	if err := mapstructure.Decode(data["items"], &items); err != nil {
-		log.Fatalln("Error items order: ", err)
-	}
-
-	if err := mapstructure.Decode(data["delivery"], &delivery); err != nil {
-		log.Fatalln("Error delivery order: ", err)
-	}
-
-	return order, payment, items, delivery
 }

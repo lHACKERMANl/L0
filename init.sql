@@ -49,6 +49,13 @@ CREATE TABLE items (
     status INT
 );
 
+CREATE TABLE IF NOT EXISTS cache_table (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_cache_key ON cache_table (key);
+
 INSERT INTO orders (order_uid, track_number, entry, date_created, customer_id, delivery_service, shardkey, sm_id, oof_shard)
 VALUES ('b563feb7b2b84b6test', 'WBILMTESTTRACK', 'WBIL', '2021-11-26T06:22:19Z', 'test', 'meest', '9', 99, '1');
 

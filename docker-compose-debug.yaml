@@ -21,7 +21,7 @@ services:
       - "4222:4222"
       - "8222:8222"
 
-  app:
+  test-container:
     build: ./
     container_name: dockerdev
     depends_on:
@@ -36,7 +36,22 @@ services:
       - SYS_PTRACE
     volumes:
       - ./config.yaml:/app/config.yaml
-    command: /dlv --headless --listen=:4000 --api-version=2 exec /server
+    command: ["/dlv", "--listen=:4000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/server"]
+
+  postgres-cache:
+    image: postgres:latest
+    container_name: postgres_cache_container
+    environment:
+      POSTGRES_DB: cacheDB
+      POSTGRES_USER: cacheUser
+      POSTGRES_PASSWORD: 123
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./cache-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_cache_data:/var/lib/postgresql/data
+    command: ["-c", "hba_file=/var/lib/postgresql/data/pg_hba.conf"]
 
 volumes:
   postgres_data:
+  postgres_cache_data:
